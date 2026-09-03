@@ -1,22 +1,24 @@
 # miniEngineWasm
 
-**miniEngineWasm** is a high‑performance, single‑file WebGL2 game engine engineered for modern web applications.  
-It prioritizes rendering efficiency through zero‑allocation mathematics, Vertex Array Object (VAO) caching, true frustum culling, and an advanced render queue.  
-The engine now includes a full suite of professional features: quaternion‑based rotation, input management, UBO‑backed lighting, instanced rendering, particle systems, post‑processing, and a simple animation system.
+**miniEngineWasm** is a high-performance, single-file WebGL2 game engine engineered for modern web applications.  
+It prioritizes rendering efficiency through zero-allocation mathematics, Vertex Array Object (VAO) caching, true frustum culling, and an advanced render queue.  
+The engine now includes a full suite of professional features: PBR shading (Cook-Torrance), cascaded shadow mapping, IBL environment reflections, post-processing bloom, fog, skeletal animation, instanced rendering, particle systems, and more.
 
-## 🚀 What’s New (v2.0)
+## 🚀 What’s New (v3.0 "Titan")
 
-- **Quaternion Rotation** – Gimbal‑lock‑free orientation on every node.  
-- **Input Manager** – Keyboard & mouse abstraction with delta tracking.  
-- **Texture & Asset Loading** – Built‑in `ResourceManager` for shaders, textures, and geometry.  
-- **Lighting with UBOs** – Directional light data packed in Uniform Buffer Objects for zero‑overhead updates.  
-- **Shader Permutation System** – Compile‑time defines (`USE_TEXTURE`, `INSTANCED`) to eliminate fragment shader branching.  
-- **Instanced Rendering** – GPU‑driven batching via `InstancedMesh` with per‑instance matrices.  
-- **Particle System** – Billboard‑point‑based particles with physics, color, and size interpolation.  
-- **Post‑Processing** – Off‑screen render targets and a bloom compositing pass.  
-- **Frustum Culling for Instanced Arrays** – Efficient visibility testing of whole instance batches.  
-- **Animation System** – Key‑framed position, rotation, and scale tracks.  
-- **Debug FPS Counter** – Built‑in FPS tracking when logging is enabled.
+- **PBR Shading** – Cook-Torrance BRDF with GGX distribution, Smith geometry, and Schlick Fresnel.  
+- **Shadow Mapping** – Directional light with PCF (Percentage Closer Filtering) for soft shadows.  
+- **IBL Environment Mapping** – Skybox and irradiance reflections via cube maps.  
+- **Post-Processing Pipeline** – Bloom (bright pass + Gaussian blur + composite) with ACES Filmic tonemapping.  
+- **Fog** – Linear, exponential, and exponential-squared fog modes.  
+- **Skeletal Animation** – Bone hierarchy, skinning, and key-framed animation clips with quaternion slerp.  
+- **Instanced Rendering with Per-Instance Colors** – Efficient GPU batching with individual color tints.  
+- **Persistent Particle Buffers** – No per-frame allocations; particle data uploaded directly to GPU.  
+- **Ring Buffer Allocator** – Zero-allocation frame data via pre-allocated typed arrays.  
+- **Extended Primitives** – Box, Sphere, Plane, Cylinder, Torus, and Skybox geometries.  
+- **Occlusion‑Ready Bounding Volumes** – AABB and bounding sphere for advanced culling.  
+- **HDR Render Targets** – Float16 framebuffers for true HDR pipeline.  
+- **Improved Resource Manager** – Central caching of shaders, textures, geometries, and cube maps.
 
 ---
 
@@ -24,18 +26,22 @@ The engine now includes a full suite of professional features: quaternion‑base
 
 | Feature                     | Description                                                                 |
 |-----------------------------|-----------------------------------------------------------------------------|
-| **WebGL2 State Cache**      | Eliminates redundant GPU calls for programs, VAOs, textures, and UBOs.      |
-| **Zero‑Allocation Math**    | `Vec3`, `Quat`, `Mat4` – all operations use pre‑allocated `out` parameters. |
-| **Advanced Render Queue**   | Opaque front‑to‑back (Early‑Z), transparent back‑to‑front.                  |
-| **True Frustum Culling**    | 6‑plane extraction from View‑Projection matrix, sphere test for meshes.     |
-| **WASM Bulk Interface**     | Shared‑memory WebAssembly for high‑throughput data (particles, skinning).   |
-| **Resource Manager**        | Central loading & caching of shaders, textures, and geometries.             |
-| **Directional Light**       | UBO‑based, ambient + diffuse with adjustable direction, color, intensity.  |
-| **Instanced Rendering**     | `InstancedMesh` holds pre‑computed matrices, rendered via `drawElementsInstanced`. |
-| **Particle System**         | Billboarded quads with velocity, lifetime, color, size – full GPU update.  |
-| **Post‑Processing Pipeline**| Render‑to‑texture, bloom (extract bright + composite).                      |
-| **Key‑Frame Animator**      | Linear interpolation of position, rotation, scale on any node.              |
-| **Input Manager**           | Keyboard state, mouse position & delta, button masking.                     |
+| **PBR Materials**           | Base color, roughness, metalness, AO, normal mapping, env reflections.      |
+| **Shadow Mapping**          | Directional light shadows with PCF soft filtering.                           |
+| **Skybox & IBL**            | Cube map environment rendering and image-based lighting.                     |
+| **Post‑Processing**         | Bloom with HDR, brightness threshold, and ACES tonemapping.                  |
+| **Fog**                     | Linear, exponential, and exp2 modes with configurable color and density.    |
+| **Skeletal Animation**      | Skeleton, bones, skinning matrices, animation clips, and quaternion interpolation. |
+| **Instanced Rendering**     | Per-instance matrix and color, drawn via `drawElementsInstanced`.            |
+| **Particle System**         | Billboarded quads with persistent buffers, velocity, lifetime, color, size. |
+| **Zero‑Allocation Math**    | `Vec3`, `Quat`, `Mat4` – all operations use pre-allocated `out` parameters. |
+| **Advanced Render Queue**   | Opaque front-to-back (Early‑Z), transparent back-to-front, shadow casters.   |
+| **True Frustum Culling**    | 6‑plane extraction from VP matrix, sphere and AABB tests.                    |
+| **WASM Bulk Interface**     | Shared‑memory WebAssembly for future high‑throughput data processing.       |
+| **Resource Manager**        | Shader permutations, texture loading, cube maps, geometry caching.          |
+| **Ring Buffer Allocator**   | Frame‑local memory pool for zero allocations in render loop.                 |
+| **WebGL2 State Cache**      | Eliminates redundant GPU calls for programs, VAOs, textures, UBOs, FBOs.    |
+| **Directional Light**       | UBO‑based with shadow matrix, intensity, ambient, and color.                |
 
 ---
 
@@ -59,110 +65,186 @@ const app = new MiniEngine.App({ canvas });
 // Access central resource manager
 const res = app.resources;
 
-// Optional: enable post‑processing (Bloom)
-app.renderer.enablePostProcessing();
+// Setup shadow mapping
+app.renderer.setupShadowMap();
 
-// Adjust camera
-app.camera.setPosition(0, 2, 10);
+// Optional: enable post‑processing (Bloom + HDR)
+app.renderer.enablePostProcessing();
+app.renderer.bloomStrength = 0.5;
+app.renderer.bloomThreshold = 1.0;
+
+// Adjust fog
+app.renderer.fogMode = 2; // 1=linear, 2=exp, 3=exp2
+app.renderer.fogDensity = 0.02;
+app.renderer.fogColor = MiniEngine.Vec3.create(0.4, 0.45, 0.55);
+
+// Configure camera
+app.camera.setPosition(0, 3, 0);
 app.camera.setRotation(-0.2, 0, 0);
 ```
 
-### 3. Loading Assets & Creating Materials
-
-The `ResourceManager` handles shader compilation and texture loading.
+### 3. Creating PBR Materials
 
 ```javascript
-// 1. Load a shader with permutations
-const litProg = res.loadShader('lit', MiniEngine.ShaderLib.basicVS, MiniEngine.ShaderLib.litFS, {
-  USE_TEXTURE: 0,
-  INSTANCED: 0
+// Load PBR shader (non-instanced)
+const pbrProg = res.loadShader('pbr', MiniEngine.ShaderLib.pbrVS, MiniEngine.ShaderLib.pbrFS, {
+  INSTANCED: 0,
+  SKINNED: 0
 });
 
-// 2. Create a material (opaque)
-const matRed = new MiniEngine.Material({
-  programInfo: litProg,
-  uniforms: { u_color: new Float32Array([1, 0.2, 0.2]) }
+// Create a metal material
+const matMetal = new MiniEngine.PBRMaterial({
+  programInfo: pbrProg,
+  baseColor: MiniEngine.Vec3.create(0.9, 0.85, 0.8),
+  roughness: 0.3,
+  metalness: 0.9,
+  ao: 1.0
 });
 
-// 3. Generate geometry
-const boxGeo = app.createBox(2, 2, 2);
-boxGeo.computeBoundingSphere();
-
-// 4. Build mesh
-const box = new MiniEngine.Mesh(boxGeo, matRed);
-box.setPosition(0, 0, -5);
-app.scene.add(box);
+// Create a rough dielectric material
+const matFloor = new MiniEngine.PBRMaterial({
+  programInfo: pbrProg,
+  baseColor: MiniEngine.Vec3.create(0.3, 0.35, 0.4),
+  roughness: 0.8,
+  metalness: 0.0
+});
 ```
 
-### 4. Instanced Rendering
-
-For hundreds of identical objects, use `InstancedMesh`.
+### 4. Geometry & Meshes
 
 ```javascript
-const litProgInst = res.loadShader('litInst', MiniEngine.ShaderLib.basicVS, MiniEngine.ShaderLib.litFS, {
-  USE_TEXTURE: 0,
-  INSTANCED: 1
+// Generate a sphere
+const sphereGeo = app.createSphere(0.5, 32, 24);
+
+// Build a mesh
+const sphere = new MiniEngine.Mesh(sphereGeo, matMetal);
+sphere.setPosition(0, 1, -5);
+app.scene.add(sphere);
+```
+
+### 5. Instanced Rendering with Per-Instance Colors
+
+For hundreds of identical objects, use `InstancedMesh` with per-instance color tinting.
+
+```javascript
+// Load instanced PBR shader
+const pbrInstProg = res.loadShader('pbrInst', MiniEngine.ShaderLib.pbrVS, MiniEngine.ShaderLib.pbrFS, {
+  INSTANCED: 1,
+  SKINNED: 0
 });
 
-const matBlue = new MiniEngine.Material({
-  programInfo: litProgInst,
-  uniforms: { u_color: [0.2, 0.4, 1] },
+const matInst = new MiniEngine.PBRMaterial({
+  programInfo: pbrInstProg,
+  baseColor: MiniEngine.Vec3.create(0.8, 0.8, 0.8),
+  roughness: 0.4,
+  metalness: 0.6,
   instanced: true
 });
 
-const instanceMesh = new MiniEngine.InstancedMesh(boxGeo, matBlue, 100);
+const boxGeo = app.createBox(1, 1, 1);
+const instMesh = new MiniEngine.InstancedMesh(boxGeo, matInst, 100);
+
 for (let i = 0; i < 100; i++) {
+  const angle = (i / 100) * Math.PI * 2;
   const mat = MiniEngine.Mat4.create();
-  MiniEngine.Mat4.translate(mat, mat, [Math.cos(i)*3, 0, Math.sin(i)*3 - 5]);
-  instanceMesh.setMatrixAt(i, mat);
+  MiniEngine.Mat4.translate(mat, mat, [Math.cos(angle) * 5, 0.5, Math.sin(angle) * 5 - 10]);
+  MiniEngine.Mat4.rotateY(mat, mat, angle);
+  MiniEngine.Mat4.scale(mat, mat, [0.5, 0.5, 0.5]);
+  instMesh.setMatrixAt(i, mat);
+  instMesh.setColorAt(i, 0.8 + Math.random() * 0.2, 0.7 + Math.random() * 0.2, 0.6 + Math.random() * 0.2, 1);
 }
-instanceMesh.count = 100;
-app.scene.add(instanceMesh);
+instMesh.count = 100;
+app.scene.add(instMesh);
 ```
 
-### 5. Lighting
-
-A default directional light is included. Customize via the renderer’s light data.
+### 6. Directional Light & Shadows
 
 ```javascript
-// Set light properties (angle, color, ambient)
-app.renderer.defaultLight.direction.set([0.5, -0.8, 0.3]);
-app.renderer.defaultLight.color.set([1.0, 1.0, 0.9]);
-app.renderer.defaultLight.intensity = 1.2;
-app.renderer.defaultLight.ambient = 0.15;
+const light = app.renderer.directionalLight;
+light.direction.set([-1, -3, -2]);
+light.direction = MiniEngine.Vec3.normalize(MiniEngine.Vec3.create(), light.direction);
+light.intensity = 2.0;
+light.ambient = 0.08;
+light.castShadow = true; // Default true after setupShadowMap()
 ```
 
-The UBO is updated automatically every frame.
+### 7. Skybox / Environment Mapping
 
-### 6. Particle System
+Load a cube map (6 images) and assign it to the renderer.
 
 ```javascript
-const ps = new MiniEngine.ParticleSystem(500);
-// Emit inside update loop
-ps.emit([0, 2, -5], [0.1, 0.5, 0], [1,0,0,1], 0.2, 2);
+const faceImages = [
+  await MiniEngine.Util.loadImage('skybox/right.jpg'),
+  await MiniEngine.Util.loadImage('skybox/left.jpg'),
+  await MiniEngine.Util.loadImage('skybox/top.jpg'),
+  await MiniEngine.Util.loadImage('skybox/bottom.jpg'),
+  await MiniEngine.Util.loadImage('skybox/front.jpg'),
+  await MiniEngine.Util.loadImage('skybox/back.jpg')
+];
+const cubeTex = res.loadCubemap('skybox', faceImages);
+app.renderer.setupSkybox(cubeTex);
+
+// Assign environment map to a material
+matMetal.envMap = cubeTex;
+matMetal.envIntensity = 0.7;
+```
+
+### 8. Skeletal Animation
+
+```javascript
+// Create skeleton
+const skeleton = new MiniEngine.Skeleton();
+
+// Root bone
+const rootBone = new MiniEngine.Bone('root');
+rootBone.setPosition(0, 0, 0);
+skeleton.addBone(rootBone, MiniEngine.Mat4.create()); // inverse bind matrix
+
+// Child bone
+const armBone = new MiniEngine.Bone('arm');
+armBone.setPosition(0, 1, 0);
+rootBone.add(armBone);
+skeleton.addBone(armBone, MiniEngine.Mat4.create());
+
+// Create skinned mesh
+const skinnedGeo = createCharacterGeometry(); // Your geometry with bone indices & weights
+const skinnedMesh = new MiniEngine.SkinnedMesh(skinnedGeo, matPBR, skeleton);
+app.scene.add(skinnedMesh);
+
+// Animation clip
+const clip = new MiniEngine.AnimationClip('walk', 2.0);
+clip.addRotationKey('arm', 0.0, MiniEngine.Quat.create(0, 0, 0, 1));
+clip.addRotationKey('arm', 0.5, MiniEngine.Quat.create(0, 0, 0.707, 0.707));
+clip.addRotationKey('arm', 1.0, MiniEngine.Quat.create(0, 0, 0, 1));
+clip.loop = true;
+
+const animator = new MiniEngine.Animator(skeleton);
+animator.play(clip);
+
+// In update loop
+animator.update(dt);
+```
+
+### 9. Particle System
+
+```javascript
+const ps = new MiniEngine.ParticleSystem(2000);
+app.particleSystems.push(ps); // Renderer automatically draws these
+
+// Emit particles
+ps.emit(
+  [0, 2, -5],           // position
+  [0.1, 0.5, 0],        // velocity
+  [1, 0, 0, 1],         // color (RGBA)
+  0.2,                  // size
+  2.0                   // lifetime (seconds)
+);
+
+// In update loop
 ps.update(dt);
-
-// Render particles (custom hook or extend renderer)
-app.renderer.renderParticles(ps, app.camera);
 ```
 
-### 7. Animation
-
-Add key‑frames to any node.
-
-```javascript
-const anim = new MiniEngine.Animator(myNode);
-anim.addKey(0, 0, [0,0,0]);        // position track (index 0)
-anim.addKey(0, 1, [0,2,0]);
-anim.addKey(1, 0, [0,0,0]);        // rotation track (index 1)
-anim.addKey(1, 1, [0, Math.PI, 0]);
-anim.loop = true;
-
-// Update in game loop
-anim.update(dt);
-```
-
-### 8. Game Loop
+### 10. Game Loop
 
 ```javascript
 app.update = function(dt) {
@@ -171,11 +253,14 @@ app.update = function(dt) {
   if (app.input.isDown('ArrowRight')) box.rotation[1] += dt * 2;
   box.markDirty();
 
-  // Animate instanced matrices
-  // ...
+  // Update animator
+  animator.update(dt);
 
   // Update particles
   ps.update(dt);
+
+  // Update instanced matrices
+  // ...
 };
 
 app.start();
@@ -191,7 +276,7 @@ For those who wish to bypass the standard pipeline, inject custom rendering, or 
 
 ```javascript
 const gl = app.renderer.gl.gl;
-// Inject wireframe overlay (requires OES_polygon_mode extension)
+// Inject wireframe overlay
 gl.disable(gl.CULL_FACE);
 gl.depthRange(0.0, 0.5); // Force overlay depth
 
@@ -225,21 +310,35 @@ app.renderer.render = function(scene, camera) {
 
 ### Particle Buffer Injection
 
-The particle system rebuilds its instance buffers each frame – you can directly modify the internal arrays before the draw call:
+The particle system maintains persistent buffers – you can directly modify the internal arrays before the draw call:
 
 ```javascript
 ps.colors[0] = 0.0; // turn first particle black
 ps.sizes[0] = 5.0;  // enlarge it
 ```
 
+### Shadow Map Manipulation
+
+Access the shadow map texture and framebuffer:
+
+```javascript
+const shadowMap = app.renderer.lightShadowMap;
+// Render custom depth into it
+gl.bindFramebuffer(gl.FRAMEBUFFER, shadowMap.framebuffer);
+// ... draw objects with a depth shader
+```
+
 ---
 
 ## Performance Guidelines
 
-1. **Zero Allocation** – Never use `Vec3.create()` inside the update loop; reuse pre‑allocated vectors.
-2. **Batch with InstancedMesh** – For > 100 identical meshes, always prefer instancing.
+1. **Zero Allocation** – Never use `Vec3.create()` inside the update loop; reuse pre-allocated vectors from the ring buffer or module scope.
+2. **Batch with InstancedMesh** – For > 100 identical meshes, always prefer instancing with per-instance colors.
 3. **Lazy Dirty Flags** – Call `markDirty()` only when a transform actually changes.
 4. **Texture Atlases** – Reduce draw calls by combining small textures.
+5. **Use PBR Materials** – They are optimized for modern GPUs; avoid legacy Phong materials.
+6. **Enable Shadows Only When Needed** – Shadow mapping is expensive; disable `castShadow` on unimportant objects.
+7. **Optimize Particle Count** – Keep particle counts within GPU buffer limits; use `app.particleSystems` for automatic rendering.
 
 ---
 
